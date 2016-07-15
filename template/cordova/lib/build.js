@@ -24,6 +24,7 @@ var shell = require('shelljs');
 var utils = require('./utils');
 var prepare = require('./prepare');
 var package = require('./package');
+var Version = require('./Version');
 var MSBuildTools = require('./MSBuildTools');
 var AppxManifest = require('./AppxManifest');
 var ConfigParser = require('./ConfigParser');
@@ -59,7 +60,7 @@ module.exports.run = function run (buildOptions) {
     var buildConfig = parseAndValidateArgs(buildOptions);
 
     return Q().then(function () {
-        // CB-something use VSINSTALLDIR environment if defined to find MSBuild
+        // CB-11548 use VSINSTALLDIR environment if defined to find MSBuild
         // If VSINSTALLDIR is not specified use default discovery mechanism
         if (!process.env.VSINSTALLDIR) {
             return MSBuildTools.findAllAvailableVersions();
@@ -288,7 +289,7 @@ function updateManifestWithPublisher(allMsBuildVersions, config) {
     if (!config.publisherId) return;
 
     var selectedBuildTargets = getBuildTargets(config);
-    var msbuild = getMsBuildForTargets(selectedBuildTargets, config, allMsBuildVersions);
+    var msbuild = getLatestMSBuild(allMsBuildVersions);
     var myBuildTargets = filterSupportedTargets(selectedBuildTargets, msbuild);
     var manifestFiles = myBuildTargets.map(function(proj) {
         return projFilesToManifests[proj];
@@ -303,7 +304,7 @@ function updateManifestWithPublisher(allMsBuildVersions, config) {
 function buildTargets(allMsBuildVersions, config) {
     // filter targets to make sure they are supported on this development machine
     var selectedBuildTargets = getBuildTargets(config);
-    var msbuild = getMsBuildForTargets(selectedBuildTargets, config, allMsBuildVersions);
+    var msbuild = getLatestMSBuild(allMsBuildVersions);
     if (!msbuild) {
         return Q.reject(new CordovaError('No valid MSBuild was detected for the selected target.'));
     }
@@ -494,14 +495,27 @@ function getBuildTargets(buildConfig) {
     return targets;
 }
 
-function getMsBuildForTargets(selectedTargets, buildConfig, allMsBuildVersions) {
+function getLatestMSBuild(allMsBuildVersions) {
     var availableVersions = allMsBuildVersions
-    .reduce(function(obj, msbuildVersion) {
-        obj[msbuildVersion.version] = msbuildVersion;
-        return obj;
-    }, {});
+    .filter(function (buildTools) {
+        // Sanitize input - filter out tools w/ invalid versions
+        return Version.tryParse(buildTools.version);
+    })
+    .sort(function (a, b) {
+        // Sort tools list - use parsed Version objects for that
+        // to respect both major and minor versions segments
+        var parsedA = Version.fromString(a.version);
+        var parsedB = Version.fromString(b.version);
 
-    return availableVersions['15.0'] || availableVersions['14.0'] || availableVersions['12.0'];
+        if (parsedA.gt(parsedB)) return -1;
+        if (parsedA.eq(parsedB)) return 0;
+        return 1;
+    });
+
+    if (availableVersions.length > 0) {
+        // After sorting the first item will be the highest version available
+        return availableVersions[0];
+    }
 }
 
 // TODO: Fix this so that it outlines supported versions based on version criteria:
@@ -528,10 +542,15 @@ function filterSupportedTargets (targets, msbuild) {
     var targetFilters = {
         '12.0': msBuild12TargetsFilter,
         '14.0': msBuild14TargetsFilter,
-        '15.0': msBuild15TargetsFilter
+        '15.x': msBuild15TargetsFilter,
+        get: function (version) {
+            // Apart from exact match also try to get filter for version range
+            // so we can find for example targets for version '15.1'
+            return this[version] || this[version.replace(/\.\d+$/, '.x')];
+        }
     };
 
-    var filter = targetFilters[msbuild.version];
+    var filter = targetFilters.get(msbuild.version);
     if (!filter) {
         events.emit('warn', 'MSBuild v' + msbuild.version + ' is not supported, aborting.');
         return [];
