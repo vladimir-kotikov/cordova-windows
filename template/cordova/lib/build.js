@@ -59,30 +59,7 @@ module.exports.run = function run (buildOptions) {
 
     var buildConfig = parseAndValidateArgs(buildOptions);
 
-    return Q().then(function () {
-        // CB-11548 use VSINSTALLDIR environment if defined to find MSBuild
-        // If VSINSTALLDIR is not specified use default discovery mechanism
-        if (!process.env.VSINSTALLDIR) {
-            return MSBuildTools.findAllAvailableVersions();
-        }
-
-        events.emit('log', 'Found VSINSTALLDIR environment variable. Attempting to build project using that version of MSBuild');
-        var msBuildPath = process.env.VSINSTALLDIR + "\\MSBuild\\15.0\\Bin";
-        fs.statSync(msBuildPath, function(err, stats) {
-            if (err && err.code === 'ENOENT') {
-                events.emit('log', 'Cannot find MSBuild path under VSINSTALLDIR. The following path does not exist: ' + msBuildPath);
-                return MSBuildTools.findAllAvailableVersions();
-            }
-        });
-
-        return MSBuildTools.getMSBuildToolsAt(msBuildPath)
-        .then(function (tools) { return [tools]; })
-        .catch(function (err) {
-            // If we failed to find msbuild at VSINSTALLDIR
-            // location we fall back to default discovery
-            return MSBuildTools.findAllAvailableVersions();
-        });
-    })
+    return Q().then(MSBuildTools.findAllAvailableVersions)
     .then(function(msbuildTools) {
         // Apply build related configs
         prepare.updateBuildConfig(buildConfig);
