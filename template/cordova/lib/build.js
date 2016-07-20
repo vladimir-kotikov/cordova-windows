@@ -67,8 +67,15 @@ module.exports.run = function run (buildOptions) {
         }
 
         events.emit('log', 'Found VSINSTALLDIR environment variable. Attempting to build project using that version of MSBuild');
+        var msBuildPath = process.env.VSINSTALLDIR + "\\MSBuild\\15.0\\Bin";
+        fs.statSync(msBuildPath, function(err, stats) {
+            if (err && err.code === 'ENOENT') {
+                events.emit('log', 'Cannot find MSBuild path under VSINSTALLDIR. The following path does not exist: ' + msBuildPath);
+                return MSBuildTools.findAllAvailableVersions();
+            }
+        });
 
-        return MSBuildTools.getMSBuildToolsAt(process.env.VSINSTALLDIR + "\\MSBuild\\15.0\\Bin")
+        return MSBuildTools.getMSBuildToolsAt(msBuildPath)
         .then(function (tools) { return [tools]; })
         .catch(function (err) {
             // If we failed to find msbuild at VSINSTALLDIR
