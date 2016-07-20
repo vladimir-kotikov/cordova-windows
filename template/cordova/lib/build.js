@@ -60,18 +60,18 @@ module.exports.run = function run (buildOptions) {
     var buildConfig = parseAndValidateArgs(buildOptions);
 
     return Q().then(function () {
-        // CB-11548 use LOCALMSBUILDBINPATH environment if defined to find MSBuild
-        // If LOCALMSBUILDBINPATH is not specified use default discovery mechanism
-        if (!process.env.LOCALMSBUILDBINPATH) {
+        // CB-11548 use VSINSTALLDIR environment if defined to find MSBuild
+        // If VSINSTALLDIR is not specified use default discovery mechanism
+        if (!process.env.VSINSTALLDIR) {
             return MSBuildTools.findAllAvailableVersions();
         }
 
-        events.emit('log', 'Found LOCALMSBUILDBINPATH environment variable. Attempting to build project using that version of MSBuild');
+        events.emit('log', 'Found VSINSTALLDIR environment variable. Attempting to build project using that version of MSBuild');
 
-        return MSBuildTools.getMSBuildToolsAt(process.env.LOCALMSBUILDBINPATH)
+        return MSBuildTools.getMSBuildToolsAt(process.env.VSINSTALLDIR)
         .then(function (tools) { return [tools]; })
         .catch(function (err) {
-            // If we failed to find msbuild at LOCALMSBUILDBINPATH
+            // If we failed to find msbuild at VSINSTALLDIR
             // location we fall back to default discovery
             return MSBuildTools.findAllAvailableVersions();
         });
