@@ -68,7 +68,7 @@ module.exports.run = function run (buildOptions) {
 
         events.emit('log', 'Found VSINSTALLDIR environment variable. Attempting to build project using that version of MSBuild');
 
-        return MSBuildTools.getMSBuildToolsAt(process.env.VSINSTALLDIR)
+        return MSBuildTools.getMSBuildToolsAt(process.env.VSINSTALLDIR + "\\MSBuild\\15.0\\Bin")
         .then(function (tools) { return [tools]; })
         .catch(function (err) {
             // If we failed to find msbuild at VSINSTALLDIR
