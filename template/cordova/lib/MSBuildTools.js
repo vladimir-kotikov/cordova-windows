@@ -74,14 +74,6 @@ MSBuildTools.prototype.buildProject = function(projFile, buildType, buildarch, o
 
 // returns full path to msbuild tools required to build the project and tools version
 module.exports.findAvailableVersion = function () {
-    if (process.env.VSINSTALLDIR) {
-        try {
-            var msBuildPath = process.env.VSINSTALLDIR + "\\MSBuild\\15.0\\Bin";
-            return Q([getMSBuildToolsAt(msBuildPath)]);
-        } catch (e) {
-        }
-    }
-
     var versions = ['15.0', '14.0', '12.0', '4.0'];
 
     return Q.all(versions.map(checkMSBuildVersion)).then(function (versions) {
@@ -92,7 +84,7 @@ module.exports.findAvailableVersion = function () {
     });
 };
 
-module.exports.findAllAvailableVersions = function () {
+function findAllAvailableVersionsFallBack() {
     var versions = ['15.0', '14.0', '12.0', '4.0'];
     events.emit('verbose', 'Searching for available MSBuild versions...');
 
@@ -101,6 +93,15 @@ module.exports.findAllAvailableVersions = function () {
             return !!item;
         });
     });
+}
+
+module.exports.findAllAvailableVersions = function () {
+    if (process.env.VSINSTALLDIR) {
+        var msBuildPath = process.env.VSINSTALLDIR + "\\MSBuild\\15.0\\Bin";
+        return getMSBuildToolsAt(msBuildPath).then(function (msBuildTools) { return [msBuildTools]; }).catch(findAllAvailableVersionsFallBack);
+    }
+
+    return findAllAvailableVersionsFallBack();
 };
 
 /**
